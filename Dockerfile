@@ -7,20 +7,29 @@ ARG VERSION
 # użycie obrazu bazowego z minimalnym systemem plików linuksa alipine
 ADD alpine-minirootfs-3.19.1-x86_64.tar /
 
-# okreśelnie katalogu w którym będzie budownana aplikacja js
-WORKDIR /usr/app
-
-# aktualizacja pakietów, instalacja node i wyczyszczenia pamięci cache
+# aktualizacja pakietów, instalacja node, gita i  i wyczyszczenia pamięci cache
+# pobranie klienta openssh który posłuży do uwierzytelnienia przy pobieraniu z repozytorium git
 RUN apk update && \
     apk add nodejs npm && \
+    apk add git && \
+    apk add openssh-client && \
     rm -rf /var/cache/apk/*
 
-# przekopiowanie plików z używanymi bibliotekami js i ich instalacja
-COPY ./package.json ./
-RUN npm install
+# utworzenie katalogu .ssh w katalogu domowym użytkownika root
+# nadanie uprawnień dla tego katalogu, w tym katalogu będą przechowywane klucze ssh
+RUN mkdir -p /root/.ssh && \
+    chmod 700 /root/.ssh
 
-# skopiowanie plików aplikacji js do kontenera
-COPY ./app.js ./
+# dodanie klucza publicznego githuba do pliku known_hosts
+RUN ssh-keyscan github.com >> ~/.ssh/known_hosts && eval $(ssh-agent)
+
+# okreśelnie katalogu w którym będzie budownana aplikacja js
+WORKDIR /usr/app
+RUN --mount=type=ssh git clone git@github.com:adrianix2000/PAwChOspr1.git
+
+WORKDIR /usr/app/PAwChOspr1
+# przekopiowanie plików z używanymi bibliotekami js i ich instalacja
+RUN npm install
 
 # etap 2
 # kolejny etap budowy obrazu
@@ -36,12 +45,14 @@ RUN apk update && \
     apk add nodejs npm && \
     rm -rf /var/cache/apk/*
 
-# skopiowanie plików z poprzedniego etapu do obrazu do obcego 
-COPY --from=build /usr/app /usr/share/nginx/html
-# skopiowanie pliku konfiguracyjengo nginx
-COPY ./default.conf /etc/nginx/conf.d
-
 WORKDIR /usr/share/nginx/html
+
+# skopiowanie plików z poprzedniego etapu do obrazu do obcego 
+COPY --from=build /usr/app/PAwChOspr1  /usr/share/nginx/html
+
+# skopiowanie pliku konfiguracyjengo nginx
+# RUN mv /usr/share/nginx/html/PAwChOspr1/default.conf /etc/nginx/conf.d
+copy --from=build /usr/app/PAwChOspr1/default.conf /etc/nginx/conf.d
 
 # wystawienie portu 80, na którym domyślnie działa nginx
 EXPOSE 80
