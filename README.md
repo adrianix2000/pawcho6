@@ -46,6 +46,6 @@ curl -X GET http://localhost
 
 ### Wynik działania aplikacji
 
-![](./Result.png)
+![](./Preview.png)
 
 
